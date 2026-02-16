@@ -1,0 +1,17 @@
+using Microsoft.EntityFrameworkCore;
+using Microsoft.EntityFrameworkCore.Design;
+
+public class ApplicationDbContextFactory : IDesignTimeDbContextFactory<ApplicationDbContext>
+{
+    public ApplicationDbContext CreateDbContext(string[] args)
+    {
+        var optionsBuilder = new DbContextOptionsBuilder<ApplicationDbContext>();
+
+       optionsBuilder.UseSqlServer(
+    "Server=localhost;Database=ApiEcommerceNET8;User ID=SA;Password=MyStrongPass123!;TrustServerCertificate=true;MultipleActiveResultSets=true"
+);
+
+
+        return new ApplicationDbContext(optionsBuilder.Options);
+    }
+}
