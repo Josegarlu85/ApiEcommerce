@@ -1,13 +1,17 @@
 using ApiEcommerce.Models.Dtos;
 using ApiEcommerce.Repository.IRepository;
+using Asp.Versioning;
 using AutoMapper;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
 
 namespace ApiEcommerce.Controllers
 {
-    [Route("api/[controller]")]
+    [Authorize(Roles = "Admin")]
+    [Route("api/v{version:apiVersion}/[controller]")] 
     [ApiController]
+      [ApiVersionNeutral]
     public class UsersController : ControllerBase
     {
         private readonly IUserRepository _userRepository;
@@ -23,31 +27,31 @@ public UsersController(IUserRepository userRepository, IMapper mapper)
 [HttpGet]
 [ProducesResponseType(StatusCodes.Status403Forbidden)]
 [ProducesResponseType(StatusCodes.Status200OK)]
-public IActionResult GetUsers()
+[HttpGet]
+public async Task<IActionResult> GetUsers()
 {
-    var users = _userRepository.GetUsers();
+    var users = await _userRepository.GetUsers(); // 
+
     var usersDto = _mapper.Map<List<UserDto>>(users);
+
     return Ok(usersDto);
 }
-        [HttpGet("{id:int}", Name = "GetUser")]
-[ProducesResponseType(StatusCodes.Status403Forbidden)]
-[ProducesResponseType(StatusCodes.Status400BadRequest)]
-[ProducesResponseType(StatusCodes.Status404NotFound)]
-[ProducesResponseType(StatusCodes.Status200OK)]
-public IActionResult GetUser(int id)
+
+[HttpGet("{id}", Name = "GetUser")]
+public async Task<IActionResult> GetUser(string id)
 {
-    var user = _userRepository.GetUser(id);
+    var user = await _userRepository.GetUser(id);
 
     if (user == null)
-    {
-        return NotFound($"El producto con el id {id} no existe");
-    }
+        return NotFound($"El usuario con el id {id} no existe");
 
-    var userDto = _mapper.Map<UserDto>(user);
+    var userDto = _mapper.Map<UserDataDto>(user);
 
     return Ok(userDto);
 }
 
+
+[AllowAnonymous]
 [HttpPost(Name ="RegisterUser")]
 [ProducesResponseType(StatusCodes.Status403Forbidden)]
 [ProducesResponseType(StatusCodes.Status400BadRequest)]
@@ -64,10 +68,7 @@ public async Task<IActionResult> RegisterUser([FromBody] CreateUserDto createUse
     {
         return BadRequest("Username es requerido");
     }
-    if (!_userRepository.IsUniqueUser(createUserDto.Username))
-    {
-        return BadRequest("El usuario ya existe");
-    }
+
     var result = await _userRepository.Register(createUserDto);
     if(result == null)
             {
@@ -75,7 +76,7 @@ public async Task<IActionResult> RegisterUser([FromBody] CreateUserDto createUse
             }
             return CreatedAtRoute("GetUser", new {id = result.Id}, result);
 }
-
+[AllowAnonymous]
 [HttpPost("Login", Name ="LoginUser")]
 [ProducesResponseType(StatusCodes.Status403Forbidden)]
 [ProducesResponseType(StatusCodes.Status400BadRequest)]
