@@ -14,44 +14,40 @@ using Microsoft.OpenApi.Models;
 
 var builder = WebApplication.CreateBuilder(args);
 
-// =============================
 //  CONEXIÓN A BASE DE DATOS
-// =============================
-var dbConnectionString = builder.Configuration.GetConnectionString("ConexionSql");
-builder.Services.AddDbContext<ApplicationDbContext>(options =>
-    options.UseSqlServer(dbConnectionString));
 
-// =============================
+var dbConnectionString = builder.Configuration.GetConnectionString("ConexionSql");
+
+builder.Services.AddDbContext<ApplicationDbContext>(options =>
+    options.UseSqlServer(dbConnectionString)
+);
+
 //  REGISTRO DE IDENTITY
-// =============================
+
 builder.Services.AddIdentity<ApplicationUser, IdentityRole>()
     .AddEntityFrameworkStores<ApplicationDbContext>()
     .AddDefaultTokenProviders();
 
-// =============================
 //  REPOSITORIOS
-// =============================
+
 builder.Services.AddScoped<ICategoryRepository, CategoryRepository>();
 builder.Services.AddScoped<IProductRepository, ProductRepository>();
 builder.Services.AddScoped<IUserRepository, UserRepository>();
 
-// =============================
 //  AUTOMAPPER
-// =============================
+
 builder.Services.AddAutoMapper(typeof(UserProfile));
 
-// =============================
 //  CACHE DE RESPUESTAS
-// =============================
+
 builder.Services.AddResponseCaching(options =>
 {
     options.MaximumBodySize = 1024 * 1024;
     options.UseCaseSensitivePaths = true;
 });
 
-// =============================
 //  JWT - AUTENTICACIÓN
-// =============================
+
 var secretKey = builder.Configuration.GetValue<string>("ApiSettings:SecretKey");
 if (string.IsNullOrEmpty(secretKey))
 {
@@ -65,7 +61,7 @@ builder.Services.AddAuthentication(options =>
 })
 .AddJwtBearer(options =>
 {
-    options.RequireHttpsMetadata = false; // En producción poner a true
+    options.RequireHttpsMetadata = false;
     options.SaveToken = true;
     options.TokenValidationParameters = new TokenValidationParameters
     {
@@ -76,22 +72,19 @@ builder.Services.AddAuthentication(options =>
     };
 });
 
-// =============================
 //  CONTROLADORES + CACHE
-// =============================
+
 builder.Services.AddControllers(option =>
 {
     option.CacheProfiles.Add(CacheProfiles.Default10, CacheProfiles.Profile10);
     option.CacheProfiles.Add(CacheProfiles.Default20, CacheProfiles.Profile20);
 });
 
-// =============================
 //  SWAGGER
-// =============================
+
 builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSwaggerGen(options =>
 {
-    // Autenticación JWT
     options.AddSecurityDefinition("Bearer", new OpenApiSecurityScheme
     {
         Description = "Autenticación JWT usando Bearer.\nEjemplo: \"12345abcdef\"",
@@ -119,7 +112,6 @@ builder.Services.AddSwaggerGen(options =>
         }
     });
 
-    // Información de versiones
     options.SwaggerDoc("v1", new OpenApiInfo
     {
         Version = "v1",
@@ -157,9 +149,8 @@ builder.Services.AddSwaggerGen(options =>
     });
 });
 
-// =============================
 //  VERSIONAMIENTO
-// =============================
+
 var apiVersioningBuilder = builder.Services.AddApiVersioning(option =>
 {
     option.AssumeDefaultVersionWhenUnspecified = true;
@@ -172,9 +163,8 @@ apiVersioningBuilder.AddApiExplorer(option =>
     option.SubstituteApiVersionInUrl = true;
 });
 
-// =============================
 //  CORS
-// =============================
+
 builder.Services.AddCors(options =>
 {
     options.AddPolicy(PolicyNames.AllowSpecificOrigin, policy =>
@@ -187,9 +177,17 @@ builder.Services.AddCors(options =>
 
 var app = builder.Build();
 
-// =============================
+//  EJECUTAR SEEDING AQUÍ
+
+using (var scope = app.Services.CreateScope())
+{
+    var context = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
+    ApiEcommerce.Data.DataSeeder.SeedData(context);
+}
+
+
 //  SWAGGER SOLO EN DESARROLLO
-// =============================
+
 if (app.Environment.IsDevelopment())
 {
     app.UseSwagger();
@@ -200,16 +198,14 @@ if (app.Environment.IsDevelopment())
     });
 }
 
+app.UseStaticFiles();
 app.UseHttpsRedirection();
-
 app.UseCors(PolicyNames.AllowSpecificOrigin);
-
 app.UseResponseCaching();
-
 app.UseAuthentication();
 app.UseAuthorization();
-
-// Mapear controladores
 app.MapControllers();
-
 app.Run();
+
+
+

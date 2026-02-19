@@ -10,8 +10,11 @@ public class UpdateProductDto
 
     public decimal Price{get;set;}
 
-    public string ImgUrl {get;set;} = string.Empty;
+    public string? ImgUrl {get;set;} 
 
+    public string? ImgUrlLocal {get;set;} 
+
+    public IFormFile? Image {get;set;}
 
     public string SKU {get;set;} = string.Empty;
 

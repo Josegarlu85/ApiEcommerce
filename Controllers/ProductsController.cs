@@ -7,225 +7,189 @@ using ApiEcommerce.Models.Dtos;
 using ApiEcommerce.Models;
 using Microsoft.AspNetCore.Authorization;
 using Asp.Versioning;
+using ApiEcommerce.Models.Dtos.Responses;
 
 namespace ApiEcommerce.Controllers
 {
-   [Authorize(Roles = "Admin")]
-    [Route("api/v{version:apiVersion}/[controller]")] 
+    [Authorize(Roles = "Admin")]
+    [Route("api/v{version:apiVersion}/[controller]")]
     [ApiController]
-     [ApiVersionNeutral]
-    
+    [ApiVersionNeutral]
     public class ProductsController : ControllerBase
     {
-         private readonly IProductRepository _productRepository;
-
-     private readonly ICategoryRepository _categoryRepository;
+        private readonly IProductRepository _productRepository;
+        private readonly ICategoryRepository _categoryRepository;
         private readonly IMapper _mapper;
 
-        public ProductsController(IProductRepository productRepository,ICategoryRepository categoryRepository , IMapper mapper)
+        public ProductsController(IProductRepository productRepository, ICategoryRepository categoryRepository, IMapper mapper)
         {
             _productRepository = productRepository;
             _categoryRepository = categoryRepository;
             _mapper = mapper;
         }
-[AllowAnonymous]
-                [HttpGet]
-        [ProducesResponseType(StatusCodes.Status403Forbidden)]
-        [ProducesResponseType(StatusCodes.Status200OK)]
+
+        //METODO REFACTORIZADO PARA GUARDAR IMÁGENES 
+
+        private void SaveProductImage(Product product, IFormFile image)
+        {
+            string fileName = product.ProductId + Guid.NewGuid().ToString() + Path.GetExtension(image.FileName);
+
+            var imagesFolder = Path.Combine(Directory.GetCurrentDirectory(), "wwwroot", "ProductsImages");
+            if (!Directory.Exists(imagesFolder))
+            {
+                Directory.CreateDirectory(imagesFolder);
+            }
+
+            var filePath = Path.Combine(imagesFolder, fileName);
+
+            using var fileStream = new FileStream(filePath, FileMode.Create);
+            image.CopyTo(fileStream);
+
+            var baseUrl = $"{HttpContext.Request.Scheme}://{HttpContext.Request.Host.Value}{HttpContext.Request.PathBase.Value}";
+            product.ImgUrl = $"{baseUrl}/ProductsImages/{fileName}";
+            product.ImgUrlLocal = filePath;
+        }
+
+
+
+        [AllowAnonymous]
+        [HttpGet]
         public IActionResult GetProducts()
         {
             var products = _productRepository.GetProducts();
             var productsDto = _mapper.Map<List<ProductDto>>(products);
-
             return Ok(productsDto);
-
-            
         }
-[AllowAnonymous]
-        [HttpGet("{productId:int}", Name = "GetProduct")]
-[ProducesResponseType(StatusCodes.Status403Forbidden)]
-[ProducesResponseType(StatusCodes.Status400BadRequest)]
-[ProducesResponseType(StatusCodes.Status404NotFound)]
-[ProducesResponseType(StatusCodes.Status200OK)]
-public IActionResult GetProduct(int productId)
-{
-    var product = _productRepository.GetProduct(productId);
 
-    if (product == null)
-    {
-        return NotFound($"El producto con el id {productId} no existe");
-    }
-
-    var productDto = _mapper.Map<ProductDto>(product);
-
-    return Ok(productDto);
-}
-
-[HttpPost]
-[ProducesResponseType(StatusCodes.Status403Forbidden)]
-[ProducesResponseType(StatusCodes.Status400BadRequest)]
-[ProducesResponseType(StatusCodes.Status401Unauthorized)]
-[ProducesResponseType(StatusCodes.Status201Created)]
-[ProducesResponseType(StatusCodes.Status500InternalServerError)]
-public IActionResult CreateProduct([FromBody] CreateProductDto createProductDto)
-{
-    if (createProductDto == null)
-    {
-        return BadRequest(ModelState);
-    }
-
-    if (_productRepository.ProductExists(createProductDto.Name))
-    {
-        ModelState.AddModelError("CustomError", "El producto ya existe");
-        return BadRequest(ModelState);
-    }
-
-        if (!_categoryRepository.CategoryExists(createProductDto.CategoryId))
-    {
-        ModelState.AddModelError("CustomError", "La categori ya existe");
-        return BadRequest(ModelState);
-    }
-
-    var product = _mapper.Map<Product>(createProductDto);
-
-    if (!_productRepository.CreateProduct(product))
-    {
-        ModelState.AddModelError("CustomError", $"Algo salió mal al guardar {product.Name}");
-        return StatusCode(500, ModelState);
-    }
-
-var createdProduct = _productRepository.GetProduct(product.ProductId);
-var productDto = _mapper.Map<ProductDto>(createdProduct);
-    return CreatedAtRoute("GetProduct", new { productId = product.ProductId }, productDto);
-}
-
-[HttpGet("searchProductByCategory/{categoryId:int}", Name = "GetProductsForCategory")]
-[ProducesResponseType(StatusCodes.Status403Forbidden)]
-[ProducesResponseType(StatusCodes.Status400BadRequest)]
-[ProducesResponseType(StatusCodes.Status404NotFound)]
-[ProducesResponseType(StatusCodes.Status200OK)]
-public IActionResult GetProductsForCategory(int categoryId)
-{
-    var products = _productRepository.GetProductsForCategory(categoryId);
-
-    if (products.Count == 0)
-    {
-        return NotFound($"No existen productos para la categoría con id {categoryId}");
-    }
-
-    var productsDto = _mapper.Map<List<ProductDto>>(products);
-
-    return Ok(productsDto);
-}
-
-[HttpGet("searchProductByNameDescription/{searchTerm}", Name = "SearchProducts")]
-[ProducesResponseType(StatusCodes.Status403Forbidden)]
-[ProducesResponseType(StatusCodes.Status400BadRequest)]
-[ProducesResponseType(StatusCodes.Status404NotFound)]
-[ProducesResponseType(StatusCodes.Status200OK)]
-public IActionResult SearchProducts(string searchTerm)
-{
-    var products = _productRepository.SearchProducts(searchTerm);
-
-    if (products == null || products.Count == 0)
-    {
-        return NotFound($"Los productos con el nombre {searchTerm} no existen");
-    }
-
-    var productsDto = _mapper.Map<List<ProductDto>>(products);
-
-    return Ok(productsDto);
-}
-
-[HttpPatch("buyProduct/{name}/{quantity:int}", Name = "BuyProduct")]
-[ProducesResponseType(StatusCodes.Status403Forbidden)]
-[ProducesResponseType(StatusCodes.Status400BadRequest)]
-[ProducesResponseType(StatusCodes.Status404NotFound)]
-[ProducesResponseType(StatusCodes.Status200OK)]
-public IActionResult BuyProduct(string name, int quantity)
-{
-    if (string.IsNullOrWhiteSpace(name) || quantity <= 0)
-    {
-        return BadRequest("El nombre del producto o la cantidad no son válidos");
-    }
-
-    var foundProduct = _productRepository.ProductExists(name);
-    if (!foundProduct)
-    {
-        return NotFound($"El producto con el nombre {name} no existe");
-    }
-
-    if (!_productRepository.BuyProduct(name, quantity))
-    {
-        ModelState.AddModelError("CustomError", $"No se pudo comprar el producto '{name}' o la cantidad solicitada ({quantity}) es mayor al stock disponible");
-        return BadRequest(ModelState);
-    }
-
-    var units = quantity == 1 ? "unidad" : "unidades";
-    return Ok($"Se compró {quantity} {units} del producto '{name}'");
-}
-
-[HttpPut("{productId:int}", Name = "UpdateProduct")]
-[ProducesResponseType(StatusCodes.Status403Forbidden)]
-[ProducesResponseType(StatusCodes.Status400BadRequest)]
-[ProducesResponseType(StatusCodes.Status401Unauthorized)]
-[ProducesResponseType(StatusCodes.Status201Created)]
-[ProducesResponseType(StatusCodes.Status500InternalServerError)]
-public IActionResult UpdateProduct(int productId, [FromBody] UpdateProductDto updateProductDto)
-{
-    if (updateProductDto == null)
-    {
-        return BadRequest(ModelState);
-    }
-
-    if (!_productRepository.ProductExists(productId))
-    {
-        return NotFound($"No se encontró un producto con el ID {productId}");
-    }
-
-    if (!_categoryRepository.CategoryExists(updateProductDto.CategoryId))
-    {
-        ModelState.AddModelError("CustomError", "La categoría especificada no existe");
-        return BadRequest(ModelState);
-    }
-
-    var product = _mapper.Map<Product>(updateProductDto);
-    product.ProductId = productId;
-    if (!_productRepository.UpdateProduct(product))
-    {
-        ModelState.AddModelError("CustomError", $"Algo salió mal al actualizar el producto {product.Name}");
-        return StatusCode(500, ModelState);
-    }
-
-return NoContent();
-}
-
-        [HttpDelete("{productId:int}", Name = "DeleteProduct")]
-[ProducesResponseType(StatusCodes.Status403Forbidden)]
-[ProducesResponseType(StatusCodes.Status400BadRequest)]
-[ProducesResponseType(StatusCodes.Status404NotFound)]
-[ProducesResponseType(StatusCodes.Status204NoContent)]
-public IActionResult DeleteProduct(int productId)
-{
-    if (productId == 0)
+        [AllowAnonymous]
+        [HttpGet("Paged", Name = "GetProductInPage")]
+        public IActionResult GetProductInPage([FromQuery] int pageNumber =1, [FromQuery] int pageSize=5)
+        {
+            if(pageNumber <1 || pageSize < 1)
             {
+                return BadRequest("Los parametros de paginacion son incorrectos");
+            }
+            var totalProducts = _productRepository.GetTotalProducts();
+            var totalPages = (int)Math.Ceiling((double)totalProducts/pageSize);
+            if(pageNumber > totalPages)
+            {
+                return NotFound("No hay mas paginas");
+            }
+            var products = _productRepository.GetProductsInPages(pageNumber, pageSize);
+
+            var productDto = _mapper.Map<List<ProductDto>>(products);
+            var paginationResponse = new PaginationResponse<ProductDto>
+            {
+                PageNumber = pageNumber,
+                PageSize = pageSize,
+                TotalPages = totalPages,
+                Items = productDto
+            };
+            return Ok(paginationResponse);
+        }
+
+           [AllowAnonymous]
+        [HttpGet("{productId:int}", Name = "GetProduct")]
+        public IActionResult GetProduct(int productId)
+        {
+            var product = _productRepository.GetProduct(productId);
+
+            if (product == null)
+            {
+                return NotFound($"El producto con el id {productId} no existe");
+            }
+
+            var productDto = _mapper.Map<ProductDto>(product);
+            return Ok(productDto);
+        }
+
+        [HttpPost]
+        public IActionResult CreateProduct([FromForm] CreateProductDto createProductDto)
+        {
+            if (createProductDto == null)
+                return BadRequest(ModelState);
+
+            if (_productRepository.ProductExists(createProductDto.Name))
+            {
+                ModelState.AddModelError("CustomError", "El producto ya existe");
                 return BadRequest(ModelState);
             }
-    var product = _productRepository.GetProduct(productId);
 
-    if (product == null)
-    {
-        return NotFound($"El producto con el id {productId} no existe");
-    }
+            if (!_categoryRepository.CategoryExists(createProductDto.CategoryId))
+            {
+                ModelState.AddModelError("CustomError", "La categoría no existe");
+                return BadRequest(ModelState);
+            }
 
-    if (!_productRepository.DeleteProduct(product))
-    {
-        ModelState.AddModelError("CustomError", $"Algo salió mal al borrar el producto {product.Name}");
-        return StatusCode(500, ModelState);
-    }
+            var product = _mapper.Map<Product>(createProductDto);
 
-    return NoContent();
-}
+            if (createProductDto.Image != null)
+                SaveProductImage(product, createProductDto.Image);
+            else
+                product.ImgUrl = "https://placehold.co/400x300";
 
+            if (!_productRepository.CreateProduct(product))
+            {
+                ModelState.AddModelError("CustomError", $"Algo salió mal al guardar {product.Name}");
+                return StatusCode(500, ModelState);
+            }
+
+            var createdProduct = _productRepository.GetProduct(product.ProductId);
+            var productDto = _mapper.Map<ProductDto>(createdProduct);
+
+            return CreatedAtRoute("GetProduct", new { productId = product.ProductId }, productDto);
+        }
+
+
+        [HttpPut("{productId:int}", Name = "UpdateProduct")]
+        public IActionResult UpdateProduct(int productId, [FromForm] UpdateProductDto updateProductDto)
+        {
+            if (updateProductDto == null)
+                return BadRequest(ModelState);
+
+            if (!_productRepository.ProductExists(productId))
+                return NotFound($"No se encontró un producto con el ID {productId}");
+
+            if (!_categoryRepository.CategoryExists(updateProductDto.CategoryId))
+            {
+                ModelState.AddModelError("CustomError", "La categoría especificada no existe");
+                return BadRequest(ModelState);
+            }
+
+            var product = _mapper.Map<Product>(updateProductDto);
+            product.ProductId = productId;
+
+            if (updateProductDto.Image != null)
+                SaveProductImage(product, updateProductDto.Image);
+
+            if (!_productRepository.UpdateProduct(product))
+            {
+                ModelState.AddModelError("CustomError", $"Algo salió mal al actualizar el producto {product.Name}");
+                return StatusCode(500, ModelState);
+            }
+
+            return NoContent();
+        }
+
+
+        [HttpDelete("{productId:int}", Name = "DeleteProduct")]
+        public IActionResult DeleteProduct(int productId)
+        {
+            if (productId == 0)
+                return BadRequest(ModelState);
+
+            var product = _productRepository.GetProduct(productId);
+
+            if (product == null)
+                return NotFound($"El producto con el id {productId} no existe");
+
+            if (!_productRepository.DeleteProduct(product))
+            {
+                ModelState.AddModelError("CustomError", $"Algo salió mal al borrar el producto {product.Name}");
+                return StatusCode(500, ModelState);
+            }
+
+            return NoContent();
+        }
     }
 }

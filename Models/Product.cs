@@ -15,7 +15,10 @@ public class Product
     [Column(TypeName ="decimal(18,2)")]
     public decimal Price{get;set;}
 
-    public string ImgUrl {get;set;} = string.Empty;
+    public string? ImgUrl {get;set;} 
+
+    
+    public string? ImgUrlLocal {get;set;} 
 
     [Required]
 
