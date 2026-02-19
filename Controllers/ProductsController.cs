@@ -2,7 +2,7 @@ using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Mvc;
 using ApiEcommerce.Repository.IRepository;
-using AutoMapper;
+using MapsterMapper;
 using ApiEcommerce.Models.Dtos;
 using ApiEcommerce.Models;
 using Microsoft.AspNetCore.Authorization;
@@ -28,8 +28,6 @@ namespace ApiEcommerce.Controllers
             _mapper = mapper;
         }
 
-        //METODO REFACTORIZADO PARA GUARDAR IMÁGENES 
-
         private void SaveProductImage(Product product, IFormFile image)
         {
             string fileName = product.ProductId + Guid.NewGuid().ToString() + Path.GetExtension(image.FileName);
@@ -50,8 +48,6 @@ namespace ApiEcommerce.Controllers
             product.ImgUrlLocal = filePath;
         }
 
-
-
         [AllowAnonymous]
         [HttpGet]
         public IActionResult GetProducts()
@@ -63,21 +59,20 @@ namespace ApiEcommerce.Controllers
 
         [AllowAnonymous]
         [HttpGet("Paged", Name = "GetProductInPage")]
-        public IActionResult GetProductInPage([FromQuery] int pageNumber =1, [FromQuery] int pageSize=5)
+        public IActionResult GetProductInPage([FromQuery] int pageNumber = 1, [FromQuery] int pageSize = 5)
         {
-            if(pageNumber <1 || pageSize < 1)
-            {
+            if (pageNumber < 1 || pageSize < 1)
                 return BadRequest("Los parametros de paginacion son incorrectos");
-            }
-            var totalProducts = _productRepository.GetTotalProducts();
-            var totalPages = (int)Math.Ceiling((double)totalProducts/pageSize);
-            if(pageNumber > totalPages)
-            {
-                return NotFound("No hay mas paginas");
-            }
-            var products = _productRepository.GetProductsInPages(pageNumber, pageSize);
 
+            var totalProducts = _productRepository.GetTotalProducts();
+            var totalPages = (int)Math.Ceiling((double)totalProducts / pageSize);
+
+            if (pageNumber > totalPages)
+                return NotFound("No hay mas paginas");
+
+            var products = _productRepository.GetProductsInPages(pageNumber, pageSize);
             var productDto = _mapper.Map<List<ProductDto>>(products);
+
             var paginationResponse = new PaginationResponse<ProductDto>
             {
                 PageNumber = pageNumber,
@@ -85,19 +80,18 @@ namespace ApiEcommerce.Controllers
                 TotalPages = totalPages,
                 Items = productDto
             };
+
             return Ok(paginationResponse);
         }
 
-           [AllowAnonymous]
+        [AllowAnonymous]
         [HttpGet("{productId:int}", Name = "GetProduct")]
         public IActionResult GetProduct(int productId)
         {
             var product = _productRepository.GetProduct(productId);
 
             if (product == null)
-            {
                 return NotFound($"El producto con el id {productId} no existe");
-            }
 
             var productDto = _mapper.Map<ProductDto>(product);
             return Ok(productDto);
@@ -133,13 +127,16 @@ namespace ApiEcommerce.Controllers
                 ModelState.AddModelError("CustomError", $"Algo salió mal al guardar {product.Name}");
                 return StatusCode(500, ModelState);
             }
+var createdProduct = _productRepository.GetProduct(product.ProductId);
 
-            var createdProduct = _productRepository.GetProduct(product.ProductId);
-            var productDto = _mapper.Map<ProductDto>(createdProduct);
+if (createdProduct == null)
+    return StatusCode(500, "Error al recuperar el producto recién creado");
+
+var productDto = _mapper.Map<ProductDto>(createdProduct);
+
 
             return CreatedAtRoute("GetProduct", new { productId = product.ProductId }, productDto);
         }
-
 
         [HttpPut("{productId:int}", Name = "UpdateProduct")]
         public IActionResult UpdateProduct(int productId, [FromForm] UpdateProductDto updateProductDto)
@@ -170,7 +167,6 @@ namespace ApiEcommerce.Controllers
 
             return NoContent();
         }
-
 
         [HttpDelete("{productId:int}", Name = "DeleteProduct")]
         public IActionResult DeleteProduct(int productId)

@@ -159,3 +159,6 @@ C:\Users\zaola\Desktop\DotNet\ApiEcommerce\bin\Debug\net8.0\Microsoft.Extensions
 C:\Users\zaola\Desktop\DotNet\ApiEcommerce\bin\Debug\net8.0\Microsoft.Extensions.Logging.Abstractions.dll
 C:\Users\zaola\Desktop\DotNet\ApiEcommerce\bin\Debug\net8.0\Microsoft.Extensions.Options.dll
 C:\Users\zaola\Desktop\DotNet\ApiEcommerce\bin\Debug\net8.0\ApiEcommerce.staticwebassets.runtime.json
+C:\Users\zaola\Desktop\DotNet\ApiEcommerce\bin\Debug\net8.0\Mapster.dll
+C:\Users\zaola\Desktop\DotNet\ApiEcommerce\bin\Debug\net8.0\Mapster.Core.dll
+C:\Users\zaola\Desktop\DotNet\ApiEcommerce\bin\Debug\net8.0\Mapster.DependencyInjection.dll

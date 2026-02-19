@@ -4,7 +4,7 @@ using System.Text;
 using ApiEcommerce.Models;
 using ApiEcommerce.Models.Dtos;
 using ApiEcommerce.Repository.IRepository;
-using AutoMapper;
+using MapsterMapper;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.IdentityModel.Tokens;
@@ -87,54 +87,56 @@ public class UserRepository : IUserRepository
         };
     }
 
-public async Task<UserDataDto> Register(CreateUserDto createUserDto)
-{
-    if (string.IsNullOrEmpty(createUserDto.Username))
-        throw new ArgumentNullException("El Username es requerido");
-
-    if (string.IsNullOrEmpty(createUserDto.Password))
-        throw new ArgumentNullException("El Password es requerido");
-
-    var user = new ApplicationUser
+    public async Task<UserDataDto> Register(CreateUserDto createUserDto)
     {
-        UserName = createUserDto.Username,
-        Email = createUserDto.Email ?? createUserDto.Username,
-        NormalizedEmail = (createUserDto.Email ?? createUserDto.Username).ToUpper(),
-        Name = createUserDto.Name
-    };
+        if (string.IsNullOrEmpty(createUserDto.Username))
+            throw new ArgumentNullException("El Username es requerido");
 
-    var result = await _userManager.CreateAsync(user, createUserDto.Password);
+        if (string.IsNullOrEmpty(createUserDto.Password))
+            throw new ArgumentNullException("El Password es requerido");
 
-    if (!result.Succeeded)
-    {
-        // Mostrar los errores REALES de Identity
-        var errors = string.Join(", ", result.Errors.Select(e => e.Description));
-        throw new ApplicationException($"No se pudo realizar el registro: {errors}");
+        var user = new ApplicationUser
+        {
+            UserName = createUserDto.Username,
+            Email = createUserDto.Email ?? createUserDto.Username,
+            NormalizedEmail = (createUserDto.Email ?? createUserDto.Username).ToUpper(),
+            Name = createUserDto.Name
+        };
+
+        var result = await _userManager.CreateAsync(user, createUserDto.Password);
+
+        if (!result.Succeeded)
+        {
+            // Mostrar los errores REALES de Identity
+            var errors = string.Join(", ", result.Errors.Select(e => e.Description));
+            throw new ApplicationException($"No se pudo realizar el registro: {errors}");
+        }
+
+        // Rol por defecto si no se envía
+        var userRole = createUserDto.Role ?? "User";
+
+        // Crear rol si no existe
+        if (!await _roleManager.RoleExistsAsync(userRole))
+        {
+            await _roleManager.CreateAsync(new IdentityRole(userRole));
+        }
+
+        // Asignar rol al usuario
+        await _userManager.AddToRoleAsync(user, userRole);
+
+        // Recuperar usuario recién creado
+        var createdUser = await _userManager.FindByNameAsync(createUserDto.Username);
+
+        if (createdUser == null)
+         throw new ApplicationException("No se pudo recuperar el usuario recién creado");
+
+        // Mapear a DTO
+        var dto = _mapper.Map<UserDataDto>(createdUser);
+
+
+        // Asignar el rol manualmente (AutoMapper no lo sabe)
+        dto.Role = userRole;
+
+        return dto;
     }
-
-    // Rol por defecto si no se envía
-    var userRole = createUserDto.Role ?? "User";
-
-    // Crear rol si no existe
-    if (!await _roleManager.RoleExistsAsync(userRole))
-    {
-        await _roleManager.CreateAsync(new IdentityRole(userRole));
-    }
-
-    // Asignar rol al usuario
-    await _userManager.AddToRoleAsync(user, userRole);
-
-    // Recuperar usuario recién creado
-    var createdUser = await _userManager.FindByNameAsync(createUserDto.Username);
-
-    // Mapear a DTO
-    var dto = _mapper.Map<UserDataDto>(createdUser);
-
-    // Asignar el rol manualmente (AutoMapper no lo sabe)
-    dto.Role = userRole;
-
-    return dto;
-}
-
-
 }
